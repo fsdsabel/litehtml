@@ -170,7 +170,7 @@ if(WIN32)
     file(TO_NATIVE_PATH ${XXD_COMMAND} XXD_COMMAND)
     file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/include/master.css MASTER_FILE)
     add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/src/master.css.inc
-        COMMAND type ${MASTER_FILE} | "${XXD_COMMAND}" -i > ${CMAKE_CURRENT_SOURCE_DIR}/src/master.css.inc)
+        COMMAND type ${MASTER_FILE} | ^"${XXD_COMMAND}^" -i > ${CMAKE_CURRENT_SOURCE_DIR}/src/master.css.inc)
 else()
     add_custom_command(OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/src/master.css.inc
         COMMAND cat ${CMAKE_CURRENT_SOURCE_DIR}/include/master.css | xxd -i > ${CMAKE_CURRENT_SOURCE_DIR}/src/master.css.inc)
