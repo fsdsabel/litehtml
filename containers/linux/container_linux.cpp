@@ -18,11 +18,11 @@ container_linux::~container_linux()
 	cairo_destroy(m_temp_cr);
 }
 
-litehtml::uint_ptr container_linux::create_font( const litehtml::tchar_t* faceName, int size, int weight, litehtml::font_style italic, unsigned int decoration, litehtml::font_metrics* fm )
+litehtml::uint_ptr container_linux::create_font( const char* faceName, int size, int weight, litehtml::font_style italic, unsigned int decoration, litehtml::font_metrics* fm )
 {
     PangoFontDescription *desc = pango_font_description_from_string (faceName);
     pango_font_description_set_absolute_size(desc, size * PANGO_SCALE);
-    if(italic == litehtml::fontStyleItalic )
+    if(italic == litehtml::font_style_italic)
     {
         pango_font_description_set_style(desc, PANGO_STYLE_ITALIC);
     } else
@@ -104,7 +104,7 @@ void container_linux::delete_font( litehtml::uint_ptr hFont )
 	}
 }
 
-int container_linux::text_width( const litehtml::tchar_t* text, litehtml::uint_ptr hFont )
+int container_linux::text_width( const char* text, litehtml::uint_ptr hFont )
 {
 	auto* fnt = (cairo_font*) hFont;
 
@@ -121,10 +121,12 @@ int container_linux::text_width( const litehtml::tchar_t* text, litehtml::uint_p
 
 	cairo_restore(m_temp_cr);
 
+    g_object_unref(layout);
+
 	return (int) x_width;
 }
 
-void container_linux::draw_text( litehtml::uint_ptr hdc, const litehtml::tchar_t* text, litehtml::uint_ptr hFont, litehtml::web_color color, const litehtml::position& pos )
+void container_linux::draw_text( litehtml::uint_ptr hdc, const char* text, litehtml::uint_ptr hFont, litehtml::web_color color, const litehtml::position& pos )
 {
 	auto* fnt = (cairo_font*) hFont;
 	auto* cr = (cairo_t*) hdc;
@@ -196,7 +198,7 @@ void container_linux::draw_list_marker( litehtml::uint_ptr hdc, const litehtml::
 {
 	if(!marker.image.empty())
 	{
-		/*litehtml::tstring url;
+		/*litehtml::string url;
 		make_url(marker.image.c_str(), marker.baseurl, url);
 
 		lock_images_cache();
@@ -244,9 +246,9 @@ void container_linux::draw_list_marker( litehtml::uint_ptr hdc, const litehtml::
 	}
 }
 
-void container_linux::load_image( const litehtml::tchar_t* src, const litehtml::tchar_t* baseurl, bool redraw_on_ready )
+void container_linux::load_image( const char* src, const char* baseurl, bool redraw_on_ready )
 {
-	litehtml::tstring url;
+	litehtml::string url;
 	make_url(src, baseurl, url);
 	if(m_images.find(url) == m_images.end())
 	{
@@ -264,9 +266,9 @@ void container_linux::load_image( const litehtml::tchar_t* src, const litehtml::
 	}
 }
 
-void container_linux::get_image_size( const litehtml::tchar_t* src, const litehtml::tchar_t* baseurl, litehtml::size& sz )
+void container_linux::get_image_size( const char* src, const char* baseurl, litehtml::size& sz )
 {
-	litehtml::tstring url;
+	litehtml::string url;
 	make_url(src, baseurl, url);
 
 	auto img = m_images.find(url);
@@ -288,11 +290,13 @@ void container_linux::get_image_size( const litehtml::tchar_t* src, const liteht
 	}
 }
 
-void container_linux::draw_background( litehtml::uint_ptr hdc, const litehtml::background_paint& bg )
+void container_linux::draw_background( litehtml::uint_ptr hdc, const std::vector<litehtml::background_paint>& bgvec )
 {
 	auto* cr = (cairo_t*) hdc;
 	cairo_save(cr);
 	apply_clip(cr);
+
+	const auto& bg = bgvec.back();
 
 	rounded_rectangle(cr, bg.border_box, bg.border_radius);
 	cairo_clip(cr);
@@ -306,64 +310,72 @@ void container_linux::draw_background( litehtml::uint_ptr hdc, const litehtml::b
 		cairo_paint(cr);
 	}
 
-	litehtml::tstring url;
-	make_url(bg.image.c_str(), bg.baseurl.c_str(), url);
-
-	//lock_images_cache();
-	auto img_i = m_images.find(url);
-	if(img_i != m_images.end() && img_i->second)
+	for (int i = (int)bgvec.size() - 1; i >= 0; i--)
 	{
-		Glib::RefPtr<Gdk::Pixbuf> bgbmp = img_i->second;
+		const auto& bg = bgvec[i];
 
-		Glib::RefPtr<Gdk::Pixbuf> new_img;
-		if(bg.image_size.width != bgbmp->get_width() || bg.image_size.height != bgbmp->get_height())
+		cairo_rectangle(cr, bg.clip_box.x, bg.clip_box.y, bg.clip_box.width, bg.clip_box.height);
+		cairo_clip(cr);
+
+		std::string url;
+		make_url(bg.image.c_str(), bg.baseurl.c_str(), url);
+
+		//lock_images_cache();
+		auto img_i = m_images.find(url);
+		if(img_i != m_images.end() && img_i->second)
 		{
-			new_img = bgbmp->scale_simple(bg.image_size.width, bg.image_size.height, Gdk::INTERP_BILINEAR);
-			bgbmp = new_img;
+			Glib::RefPtr<Gdk::Pixbuf> bgbmp = img_i->second;
+
+			Glib::RefPtr<Gdk::Pixbuf> new_img;
+			if(bg.image_size.width != bgbmp->get_width() || bg.image_size.height != bgbmp->get_height())
+			{
+				new_img = bgbmp->scale_simple(bg.image_size.width, bg.image_size.height, Gdk::INTERP_BILINEAR);
+				bgbmp = new_img;
+			}
+
+			cairo_surface_t* img = surface_from_pixbuf(bgbmp);
+			cairo_pattern_t *pattern = cairo_pattern_create_for_surface(img);
+			cairo_matrix_t flib_m;
+			cairo_matrix_init_identity(&flib_m);
+			cairo_matrix_translate(&flib_m, -bg.position_x, -bg.position_y);
+			cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
+			cairo_pattern_set_matrix (pattern, &flib_m);
+
+			switch(bg.repeat)
+			{
+			case litehtml::background_repeat_no_repeat:
+				draw_pixbuf(cr, bgbmp, bg.position_x, bg.position_y, bgbmp->get_width(), bgbmp->get_height());
+				break;
+
+			case litehtml::background_repeat_repeat_x:
+				cairo_set_source(cr, pattern);
+				cairo_rectangle(cr, bg.clip_box.left(), bg.position_y, bg.clip_box.width, bgbmp->get_height());
+				cairo_fill(cr);
+				break;
+
+			case litehtml::background_repeat_repeat_y:
+				cairo_set_source(cr, pattern);
+				cairo_rectangle(cr, bg.position_x, bg.clip_box.top(), bgbmp->get_width(), bg.clip_box.height);
+				cairo_fill(cr);
+				break;
+
+			case litehtml::background_repeat_repeat:
+				cairo_set_source(cr, pattern);
+				cairo_rectangle(cr, bg.clip_box.left(), bg.clip_box.top(), bg.clip_box.width, bg.clip_box.height);
+				cairo_fill(cr);
+				break;
+			}
+
+			cairo_pattern_destroy(pattern);
+			cairo_surface_destroy(img);
 		}
-
-		cairo_surface_t* img = surface_from_pixbuf(bgbmp);
-		cairo_pattern_t *pattern = cairo_pattern_create_for_surface(img);
-		cairo_matrix_t flib_m;
-		cairo_matrix_init_identity(&flib_m);
-		cairo_matrix_translate(&flib_m, -bg.position_x, -bg.position_y);
-		cairo_pattern_set_extend (pattern, CAIRO_EXTEND_REPEAT);
-		cairo_pattern_set_matrix (pattern, &flib_m);
-
-		switch(bg.repeat)
-		{
-		case litehtml::background_repeat_no_repeat:
-			draw_pixbuf(cr, bgbmp, bg.position_x, bg.position_y, bgbmp->get_width(), bgbmp->get_height());
-			break;
-
-		case litehtml::background_repeat_repeat_x:
-			cairo_set_source(cr, pattern);
-			cairo_rectangle(cr, bg.clip_box.left(), bg.position_y, bg.clip_box.width, bgbmp->get_height());
-			cairo_fill(cr);
-			break;
-
-		case litehtml::background_repeat_repeat_y:
-			cairo_set_source(cr, pattern);
-			cairo_rectangle(cr, bg.position_x, bg.clip_box.top(), bgbmp->get_width(), bg.clip_box.height);
-			cairo_fill(cr);
-			break;
-
-		case litehtml::background_repeat_repeat:
-			cairo_set_source(cr, pattern);
-			cairo_rectangle(cr, bg.clip_box.left(), bg.clip_box.top(), bg.clip_box.width, bg.clip_box.height);
-			cairo_fill(cr);
-			break;
-		}
-
-		cairo_pattern_destroy(pattern);
-		cairo_surface_destroy(img);
-
+		//unlock_images_cache();
 	}
-//	unlock_images_cache();
+
 	cairo_restore(cr);
 }
 
-void container_linux::make_url(const litehtml::tchar_t* url,	const litehtml::tchar_t* basepath, litehtml::tstring& out)
+void container_linux::make_url(const char* url,	const char* basepath, litehtml::string& out)
 {
 	out = url;
 }
@@ -686,27 +698,14 @@ void container_linux::draw_borders(litehtml::uint_ptr hdc, const litehtml::borde
 	cairo_restore(cr);
 }
 
-void container_linux::transform_text(litehtml::tstring& text, litehtml::text_transform tt)
+void container_linux::transform_text(litehtml::string& text, litehtml::text_transform tt)
 {
 
 }
 
-void container_linux::set_clip( const litehtml::position& pos, const litehtml::border_radiuses& bdr_radius, bool valid_x, bool valid_y )
+void container_linux::set_clip( const litehtml::position& pos, const litehtml::border_radiuses& bdr_radius )
 {
-	litehtml::position clip_pos = pos;
-	litehtml::position client_pos;
-	get_client_rect(client_pos);
-	if(!valid_x)
-	{
-		clip_pos.x		= client_pos.x;
-		clip_pos.width	= client_pos.width;
-	}
-	if(!valid_y)
-	{
-		clip_pos.y		= client_pos.y;
-		clip_pos.height	= client_pos.height;
-	}
-	m_clips.emplace_back(clip_pos, bdr_radius);
+	m_clips.emplace_back(pos, bdr_radius);
 }
 
 void container_linux::del_clip()
@@ -778,12 +777,12 @@ void container_linux::clear_images()
 */
 }
 
-const litehtml::tchar_t* container_linux::get_default_font_name() const
+const char* container_linux::get_default_font_name() const
 {
 	return "Times New Roman";
 }
 
-std::shared_ptr<litehtml::element>	container_linux::create_element(const litehtml::tchar_t *tag_name,
+std::shared_ptr<litehtml::element>	container_linux::create_element(const char *tag_name,
 																	  const litehtml::string_map &attributes,
 																	  const std::shared_ptr<litehtml::document> &doc)
 {
@@ -883,10 +882,10 @@ void container_linux::get_media_features(litehtml::media_features& media) const
 	media.resolution	= 96;
 }
 
-void container_linux::get_language(litehtml::tstring& language, litehtml::tstring& culture) const
+void container_linux::get_language(litehtml::string& language, litehtml::string& culture) const
 {
-	language = _t("en");
-	culture = _t("");
+	language = "en";
+	culture = "";
 }
 
 void container_linux::link(const std::shared_ptr<litehtml::document> &ptr, const litehtml::element::ptr& el)
