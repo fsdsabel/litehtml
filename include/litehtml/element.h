@@ -35,6 +35,10 @@ namespace litehtml
 
 		virtual void select_all(const css_selector& selector, elements_list& res);
 		element::ptr _add_before_after(int type, const style& style);
+
+	private:
+		std::map<string_id, int>	m_counter_values;
+
 	public:
 		explicit element(const std::shared_ptr<document>& doc);
 		virtual ~element() = default;
@@ -98,19 +102,10 @@ namespace litehtml
 		virtual void				compute_styles(bool recursive = true);
 		virtual void				draw(uint_ptr hdc, int x, int y, const position *clip, const std::shared_ptr<render_item>& ri);
 		virtual void				draw_background(uint_ptr hdc, int x, int y, const position *clip, const std::shared_ptr<render_item> &ri);
-		virtual int					get_enum_property  (string_id name, bool inherited, int           default_value, uint_ptr css_properties_member_offset) const;
-		virtual css_length			get_length_property(string_id name, bool inherited, css_length    default_value, uint_ptr css_properties_member_offset) const;
-		virtual web_color			get_color_property (string_id name, bool inherited, web_color     default_value, uint_ptr css_properties_member_offset) const;
-		virtual string				get_string_property(string_id name, bool inherited, const string& default_value, uint_ptr css_properties_member_offset) const;
-		virtual float				get_number_property(string_id name, bool inherited, float         default_value, uint_ptr css_properties_member_offset) const;
-		virtual string_vector		get_string_vector_property(string_id name, bool inherited, const string_vector& default_value, uint_ptr css_properties_member_offset) const;
-		virtual int_vector			get_int_vector_property   (string_id name, bool inherited, const int_vector&    default_value, uint_ptr css_properties_member_offset) const;
-		virtual length_vector		get_length_vector_property(string_id name, bool inherited, const length_vector& default_value, uint_ptr css_properties_member_offset) const;
-		virtual size_vector			get_size_vector_property  (string_id name, bool inherited, const size_vector&   default_value, uint_ptr css_properties_member_offset) const;
-		virtual string				get_custom_property(string_id name, const string& default_value) const;
 
 		virtual void				get_text(string& text);
 		virtual void				parse_attributes();
+		virtual int					select(const css_selector::vector& selector_list, bool apply_pseudo = true);
 		virtual int					select(const string& selector);
 		virtual int					select(const css_selector& selector, bool apply_pseudo = true);
 		virtual int					select(const css_element_selector& selector, bool apply_pseudo = true);
@@ -119,8 +114,8 @@ namespace litehtml
 		virtual element::ptr		find_adjacent_sibling(const element::ptr& el, const css_selector& selector, bool apply_pseudo = true, bool* is_pseudo = nullptr);
 		virtual element::ptr		find_sibling(const element::ptr& el, const css_selector& selector, bool apply_pseudo = true, bool* is_pseudo = nullptr);
 		virtual void				get_content_size(size& sz, int max_width);
-		virtual bool				is_nth_child(const element::ptr& el, int num, int off, bool of_type) const;
-		virtual bool				is_nth_last_child(const element::ptr& el, int num, int off, bool of_type) const;
+		virtual bool				is_nth_child(const element::ptr& el, int num, int off, bool of_type, const css_selector::vector& selector_list = {}) const;
+		virtual bool				is_nth_last_child(const element::ptr& el, int num, int off, bool of_type, const css_selector::vector& selector_list = {}) const;
 		virtual bool				is_only_child(const element::ptr& el, bool of_type) const;
 		virtual void				add_style(const style& style);
 		virtual const background*	get_background(bool own_only = false);
@@ -142,6 +137,16 @@ namespace litehtml
 		{
 			return _add_before_after(1, style);
 		}
+
+		string				get_counter_value(const string& counter_name);
+		string				get_counters_value(const string_vector& parameters);
+		void				increment_counter(const string_id& counter_name_id, const int increment = 1);
+		void				reset_counter(const string_id& counter_name_id, const int value = 0);
+
+	private:
+		std::vector<element::ptr> get_siblings_before() const;
+		bool				find_counter(const string_id& counter_name_id, std::map<string_id, int>::iterator& map_iterator);
+		void				parse_counter_tokens(const string_vector& tokens, const int default_value, std::function<void(const string_id&, const int)> handler) const;
 	};
 
 	//////////////////////////////////////////////////////////////////////////

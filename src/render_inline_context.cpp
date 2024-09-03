@@ -3,7 +3,7 @@
 #include "document.h"
 #include "iterators.h"
 
-int litehtml::render_item_inline_context::_render_content(int x, int y, bool second_pass, const containing_block_context &self_size, formatting_context* fmt_ctx)
+int litehtml::render_item_inline_context::_render_content(int /*x*/, int /*y*/, bool /*second_pass*/, const containing_block_context &self_size, formatting_context* fmt_ctx)
 {
     m_line_boxes.clear();
 	m_max_line_width = 0;
@@ -49,20 +49,20 @@ int litehtml::render_item_inline_context::_render_content(int x, int y, bool sec
 							}
 						}
 						// place element into rendering flow
-						place_inline(std::unique_ptr<line_box_item>(new line_box_item(el)), self_size, fmt_ctx);
+						place_inline(std::make_unique<line_box_item>(el), self_size, fmt_ctx);
 					}
 					break;
 
 				case iterator_item_type_start_parent:
 					{
 						el->clear_inline_boxes();
-						place_inline(std::unique_ptr<lbi_start>(new lbi_start(el)), self_size, fmt_ctx);
+						place_inline(std::make_unique<lbi_start>(el), self_size, fmt_ctx);
 					}
 					break;
 
 				case iterator_item_type_end_parent:
 				{
-					place_inline(std::unique_ptr<lbi_end>(new lbi_end(el)), self_size, fmt_ctx);
+					place_inline(std::make_unique<lbi_end>(el), self_size, fmt_ctx);
 				}
 					break;
 			}
@@ -224,12 +224,12 @@ int litehtml::render_item_inline_context::new_box(const std::unique_ptr<line_box
         }
     }
 
-    m_line_boxes.emplace_back(std::unique_ptr<line_box>(new line_box(
+    m_line_boxes.emplace_back(std::make_unique<line_box>(
 			line_ctx.top,
 			line_ctx.left + first_line_margin + text_indent, line_ctx.right,
 			css().get_line_height(),
 			css().get_font_metrics(),
-			css().get_text_align())));
+			css().get_text_align()));
 
 	// Add items returned by finish_last_box function into the new line
 	for(auto& it : items)
@@ -259,13 +259,11 @@ void litehtml::render_item_inline_context::place_inline(std::unique_ptr<line_box
 		return;
     }
 
-    line_context line_ctx = {0};
-    line_ctx.top = 0;
+    line_context line_ctx;
     if (!m_line_boxes.empty())
     {
         line_ctx.top = m_line_boxes.back().get()->top();
     }
-    line_ctx.left = 0;
     line_ctx.right = self_size.render_width;
     line_ctx.fix_top();
 	fmt_ctx->get_line_left_right(line_ctx.top, self_size.render_width, line_ctx.left, line_ctx.right);
@@ -382,21 +380,30 @@ void litehtml::render_item_inline_context::apply_vertical_align()
     }
 }
 
-int litehtml::render_item_inline_context::get_base_line()
+int litehtml::render_item_inline_context::get_first_baseline()
 {
-    auto el_parent = parent();
-    if(el_parent && src_el()->css().get_display() == display_inline_flex)
-    {
-        return el_parent->get_base_line();
-    }
-    if(src_el()->is_replaced())
-    {
-        return 0;
-    }
-    int bl = 0;
-    if(!m_line_boxes.empty())
-    {
-        bl = m_line_boxes.back()->baseline() + content_offset_bottom();
-    }
-    return bl;
+	int bl;
+	if(!m_line_boxes.empty())
+	{
+		const auto &line = m_line_boxes.front();
+		bl = line->bottom() - line->baseline() + content_offset_top();
+	} else
+	{
+		bl = height() - margin_bottom();
+	}
+	return bl;
+}
+
+int litehtml::render_item_inline_context::get_last_baseline()
+{
+	int bl;
+	if(!m_line_boxes.empty())
+	{
+		const auto &line = m_line_boxes.back();
+		bl = line->bottom() - line->baseline() + content_offset_top();
+	} else
+	{
+		bl = height() - margin_bottom();
+	}
+	return bl;
 }

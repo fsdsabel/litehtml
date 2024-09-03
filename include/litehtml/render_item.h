@@ -29,7 +29,7 @@ namespace litehtml
 
 		containing_block_context calculate_containing_block_context(const containing_block_context& cb_context);
 		void calc_cb_length(const css_length& len, int percent_base, containing_block_context::typed_int& out_value) const;
-		virtual int _render(int x, int y, const containing_block_context& containing_block_size, formatting_context* fmt_ctx, bool second_pass = false)
+		virtual int _render(int /*x*/, int /*y*/, const containing_block_context& /*containing_block_size*/, formatting_context* /*fmt_ctx*/, bool /*second_pass = false*/)
 		{
 			return 0;
 		}
@@ -86,7 +86,7 @@ namespace litehtml
 
         int width() const
         {
-            return m_pos.width + m_margins.left + m_margins.right + m_padding.width() + m_borders.width();
+            return m_pos.width + m_margins.width() + m_padding.width() + m_borders.width();
         }
 
         int padding_top() const
@@ -222,29 +222,91 @@ namespace litehtml
             return content_offset_top() + content_offset_bottom();
         }
 
+		int render_offset_left() const
+		{
+			if(css().get_box_sizing() == box_sizing_content_box)
+			{
+				return m_margins.left + m_borders.left + m_padding.left;
+			}
+			return m_margins.left;
+		}
+
+		int render_offset_right() const
+		{
+			if(css().get_box_sizing() == box_sizing_content_box)
+			{
+				return m_margins.right + m_borders.right + m_padding.right;
+			}
+			return m_margins.right;
+		}
+
+		int render_offset_width() const
+		{
+			return render_offset_left() + render_offset_right();
+		}
+
+		int render_offset_top() const
+		{
+			if(css().get_box_sizing() == box_sizing_content_box)
+			{
+				return m_margins.top + m_borders.top + m_padding.top;
+			}
+			return m_margins.top;
+		}
+
+		int render_offset_bottom() const
+		{
+			if(css().get_box_sizing() == box_sizing_content_box)
+			{
+				return m_margins.bottom + m_borders.bottom + m_padding.bottom;
+			}
+			return m_margins.bottom;
+		}
+
+		int render_offset_height() const
+		{
+			return render_offset_top() + render_offset_bottom();
+		}
+
 		int box_sizing_left() const
 		{
-			return m_padding.left + m_borders.left;
+			if(css().get_box_sizing() == box_sizing_border_box)
+			{
+				return m_padding.left + m_borders.left;
+			}
+			return 0;
 		}
 
 		int box_sizing_right() const
 		{
-			return m_padding.right + m_borders.right;
+			if(css().get_box_sizing() == box_sizing_border_box)
+			{
+				return m_padding.right + m_borders.right;
+			}
+			return 0;
 		}
 
 		int box_sizing_width() const
 		{
-			return box_sizing_left() + box_sizing_left();
+			return box_sizing_left() + box_sizing_right();
 		}
 
 		int box_sizing_top() const
 		{
-			return m_padding.top + m_borders.top;
+			if(css().get_box_sizing() == box_sizing_border_box)
+			{
+				return m_padding.top + m_borders.top;
+			}
+			return 0;
 		}
 
 		int box_sizing_bottom() const
 		{
-			return m_padding.bottom + m_borders.bottom;
+			if(css().get_box_sizing() == box_sizing_border_box)
+			{
+				return m_padding.bottom + m_borders.bottom;
+			}
+			return 0;
 		}
 
 		int box_sizing_height() const
@@ -285,6 +347,7 @@ namespace litehtml
                    m_element->in_normal_flow() &&
                    m_element->css().get_float() == float_none &&
                    m_margins.top >= 0 &&
+				   !is_flex_item() &&
                    !is_root();
         }
 
@@ -303,16 +366,34 @@ namespace litehtml
             return !(m_skip || src_el()->css().get_display() == display_none || src_el()->css().get_visibility() != visibility_visible);
         }
 
+		bool is_flex_item() const
+		{
+			auto par = parent();
+			if(par && (par->css().get_display() == display_inline_flex || par->css().get_display() == display_flex))
+			{
+				return true;
+			}
+			return false;
+		}
+
 		int render(int x, int y, const containing_block_context& containing_block_size, formatting_context* fmt_ctx, bool second_pass = false);
-        int calc_width(int defVal, int containing_block_width) const;
-        bool get_predefined_height(int& p_height, int containing_block_height) const;
         void apply_relative_shift(const containing_block_context &containing_block_size);
         void calc_outlines( int parent_width );
         int calc_auto_margins(int parent_width);	// returns left margin
 
         virtual std::shared_ptr<render_item> init();
         virtual void apply_vertical_align() {}
-        virtual int get_base_line() { return 0; }
+		/**
+		 * Get first baseline position. Default position is element bottom without bottom margin.
+		 * @returns offset of the first baseline from element top
+		 */
+		virtual int get_first_baseline() { return height() - margin_bottom(); }
+		/**
+		 * Get last baseline position.  Default position is element bottom without bottom margin.
+		 * @returns offset of the last baseline from element top
+		 */
+		virtual int get_last_baseline() { return height() - margin_bottom(); }
+
         virtual std::shared_ptr<render_item> clone()
         {
             return std::make_shared<render_item>(src_el());
@@ -327,9 +408,9 @@ namespace litehtml
         void add_positioned(const std::shared_ptr<litehtml::render_item> &el);
         void get_redraw_box(litehtml::position& pos, int x = 0, int y = 0);
         void calc_document_size( litehtml::size& sz, litehtml::size& content_size, int x = 0, int y = 0 );
-		virtual void get_inline_boxes( position::vector& boxes ) const {};
-		virtual void set_inline_boxes( position::vector& boxes ) {};
-		virtual void add_inline_box( const position& box ) {};
+		virtual void get_inline_boxes( position::vector& /*boxes*/ ) const {};
+		virtual void set_inline_boxes( position::vector& /*boxes*/ ) {};
+		virtual void add_inline_box( const position& /*box*/ ) {};
 		virtual void clear_inline_boxes() {};
         void draw_stacking_context( uint_ptr hdc, int x, int y, const position* clip, bool with_positioned );
         virtual void draw_children( uint_ptr hdc, int x, int y, const position* clip, draw_flag flag, int zindex );

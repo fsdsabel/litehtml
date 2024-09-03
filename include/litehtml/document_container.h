@@ -22,6 +22,12 @@ namespace litehtml
 		int				index;
 		uint_ptr		font;
 	};
+	
+	enum mouse_event
+	{
+		mouse_event_enter,
+		mouse_event_leave,
+	};
 
 	// call back interface to draw text, images and other elements
 	class document_container
@@ -37,17 +43,18 @@ namespace litehtml
 		virtual void				draw_list_marker(litehtml::uint_ptr hdc, const litehtml::list_marker& marker) = 0;
 		virtual void				load_image(const char* src, const char* baseurl, bool redraw_on_ready) = 0;
 		virtual void				get_image_size(const char* src, const char* baseurl, litehtml::size& sz) = 0;
-		// Note: regular <img> images are also drawn with draw_background
-		// bg is guaranteed to have at least one item.
-		// backgrounds in bg are in CSS order - the last one is the farthest from the user.
-		// only the last background has valid background-color.
-		virtual void				draw_background(litehtml::uint_ptr hdc, const std::vector<litehtml::background_paint>& bg) = 0;
+		virtual void				draw_image(litehtml::uint_ptr hdc, const background_layer& layer, const std::string& url, const std::string& base_url) = 0;
+		virtual void				draw_solid_fill(litehtml::uint_ptr hdc, const background_layer& layer, const web_color& color) = 0;
+		virtual void				draw_linear_gradient(litehtml::uint_ptr hdc, const background_layer& layer, const background_layer::linear_gradient& gradient) = 0;
+		virtual void				draw_radial_gradient(litehtml::uint_ptr hdc, const background_layer& layer, const background_layer::radial_gradient& gradient) = 0;
+		virtual void				draw_conic_gradient(litehtml::uint_ptr hdc, const background_layer& layer, const background_layer::conic_gradient& gradient) = 0;
 		virtual void				draw_borders(litehtml::uint_ptr hdc, const litehtml::borders& borders, const litehtml::position& draw_pos, bool root) = 0;
 
 		virtual	void				set_caption(const char* caption) = 0;
 		virtual	void				set_base_url(const char* base_url) = 0;
 		virtual void				link(const std::shared_ptr<litehtml::document>& doc, const litehtml::element::ptr& el) = 0;
 		virtual void				on_anchor_click(const char* url, const litehtml::element::ptr& el) = 0;
+		virtual void				on_mouse_event(const litehtml::element::ptr& el, litehtml::mouse_event event) = 0;
 		virtual	void				set_cursor(const char* cursor) = 0;
 		virtual	void				transform_text(litehtml::string& text, litehtml::text_transform tt) = 0;
 		virtual void				import_css(litehtml::string& text, const litehtml::string& url, litehtml::string& baseurl) = 0;
@@ -64,7 +71,7 @@ namespace litehtml
 		virtual void				split_text(const char* text, const std::function<void(const char*)>& on_word, const std::function<void(const char*)>& on_space);
 
 	protected:
-		~document_container() = default;
+		virtual ~document_container() = default;
 	};
 }
 
