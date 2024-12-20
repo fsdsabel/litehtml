@@ -10,6 +10,7 @@
 #include <set>
 #include <variant>
 #include <optional>
+#include <algorithm>
 
 namespace litehtml
 {
@@ -194,18 +195,22 @@ namespace litehtml
 
 	struct font_metrics
 	{
+		int 	font_size;
 		int		height;
 		int		ascent;
 		int		descent;
 		int		x_height;
+		int 	ch_width;
 		bool	draw_spaces;
 
 		font_metrics()
 		{
+			font_size		= 0;
 			height			= 0;
 			ascent			= 0;
 			descent			= 0;
 			x_height		= 0;
+			ch_width		= 0;
 			draw_spaces		= true;
 		}
 		int base_line() const	{ return descent; }
@@ -371,6 +376,8 @@ namespace litehtml
 		font_style_italic
 	};
 
+#define  font_system_family_name_strings		"caption;icon;menu;message-box;small-caption;status-bar"
+
 #define  font_variant_strings		"normal;small-caps"
 
 	enum font_variant
@@ -487,7 +494,7 @@ namespace litehtml
 		clear_both
 	};
 
-#define  css_units_strings	"none;%;in;cm;mm;em;ex;pt;pc;px;vw;vh;vmin;vmax;rem"
+#define  css_units_strings	"none;%;in;cm;mm;em;ex;pt;pc;px;vw;vh;vmin;vmax;rem;ch"
 
 	enum css_units : byte // see css_length
 	{
@@ -506,6 +513,7 @@ namespace litehtml
 		css_units_vmin,
 		css_units_vmax,
 		css_units_rem,
+		css_units_ch,
 	};
 
 #define  background_attachment_strings	"scroll;fixed"
@@ -822,6 +830,27 @@ namespace litehtml
 		_baseline_type m_type;
 	};
 
+#define appearance_strings      "none;auto;menulist-button;textfield;button;checkbox;listbox;menulist;meter;progress-bar;push-button;radio;searchfield;slider-horizontal;square-button;textarea"
+
+	enum appearance
+	{
+		appearance_none,
+		appearance_auto,
+		appearance_menulist_button,
+		appearance_textfield,
+		appearance_button,
+		appearance_checkbox,
+		appearance_listbox,
+		appearance_menulist,
+		appearance_meter,
+		appearance_progress_bar,
+		appearance_push_button,
+		appearance_radio,
+		appearance_searchfield,
+		appearance_slider_horizontal,
+		appearance_square_button,
+		appearance_textarea,
+	};
 
 #define box_sizing_strings		"content-box;border-box"
 
